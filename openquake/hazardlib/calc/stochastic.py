@@ -156,10 +156,10 @@ def build_eb_ruptures(src, rlzs, num_ses, cmaker, s_sites, rup_n_occ=()):
     # NB: s_sites can be None if cmaker.maximum_distance is False, then
     # the contexts are not computed and the ruptures not filtered
     ebrs = []
-    samples = getattr(src, 'samples', 1)
+    #samples = getattr(src, 'samples', 1)
     nr = len(rlzs)
     if rup_n_occ == ():
-        rup_n_occ = src.sample_ruptures(samples, num_ses, cmaker.ir_mon)
+        rup_n_occ = src.sample_ruptures(1, num_ses, cmaker.ir_mon)
     for rup, n_occ in rup_n_occ:
         if cmaker.maximum_distance:
             with cmaker.ctx_mon:
@@ -171,8 +171,8 @@ def build_eb_ruptures(src, rlzs, num_ses, cmaker, s_sites, rup_n_occ=()):
         else:
             indices = ()
 
-        if not hasattr(src, 'samples'):  # full enumeration
-            n_occ = fix_shape(n_occ, nr)
+        #if not hasattr(src, 'samples'):  # full enumeration
+        n_occ = fix_shape(n_occ, nr)
 
         # creating events
         with cmaker.evs_mon:
