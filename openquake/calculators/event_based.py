@@ -122,7 +122,7 @@ def set_counts(dstore, dsetname):
 
 def set_random_years(dstore, name, ses_seed, investigation_time):
     """
-    Set on the `events` dataset year labels sensitive to the
+    Order the `events` dataset and set year labels sensitive to the
     SES ordinal and the investigation time.
 
     :param dstore: a DataStore instance
@@ -131,9 +131,10 @@ def set_random_years(dstore, name, ses_seed, investigation_time):
     :param investigation_time: investigation time
     """
     events = dstore[name].value
+    events.sort()
     numpy.random.seed(ses_seed)
     years = numpy.random.choice(investigation_time, len(events)) + 1
-    year_of = dict(zip(numpy.sort(events['eid']), years))  # eid -> year
+    year_of = dict(zip(events['eid'], years))  # eid -> year
     for event in events:
         event['year'] = year_of[event['eid']]
     dstore[name] = events

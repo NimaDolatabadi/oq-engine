@@ -225,7 +225,6 @@ class EventGetter(object):
             return self.eid2idx
         self.dstore.open('r')  # if closed
         eids = self.dstore['events']['eid']
-        eids.sort()
         self.eid2idx = dict(
             zip(eids, numpy.arange(len(eids), dtype=U32)))
         return self.eid2idx
