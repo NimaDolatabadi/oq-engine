@@ -607,7 +607,8 @@ class HazardCalculator(BaseCalculator):
                 logging.info('Extracted %d/%d assets',
                              len(self.assetcol), len(assetcol))
                 nsites = len(self.sitecol)
-                if nsites > MAXSITES:  # hard-coded, heuristic
+                if (oq.spatial_correlation != 'no correlation' and
+                        nsites > MAXSITES):  # hard-coded, heuristic
                     raise ValueError(CORRELATION_MATRIX_TOO_LARGE % nsites)
             elif hasattr(self, 'sitecol') and general.not_equal(
                     self.sitecol.sids, haz_sitecol.sids):
@@ -794,8 +795,6 @@ class RiskCalculator(HazardCalculator):
         rinfo = []
         assets_by_site = self.assetcol.assets_by_site()
         dstore = self.can_read_parent() or self.datastore
-        self.param['event_getter'] = event_getter = getters.EventGetter(
-            dstore, self.oqparam.calculation_mode)
         for sid, assets in enumerate(assets_by_site):
             if len(assets) == 0:
                 continue
@@ -808,7 +807,6 @@ class RiskCalculator(HazardCalculator):
             if dstore is self.datastore:
                 # read the hazard data in the controller node
                 getter.init()
-                event_getter.init()
             else:
                 # the datastore must be closed to avoid the HDF5 fork bug
                 assert dstore.hdf5 == (), '%s is not closed!' % dstore
