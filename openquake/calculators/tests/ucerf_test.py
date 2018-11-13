@@ -48,7 +48,7 @@ def manage_shared_dir_error(func, self):
 
 class UcerfTestCase(CalculatorTestCase):
 
-    @attr('qa', 'hazard', 'ucerf')
+    @attr('qa', 'hazard', 'event_based', 'ucerf')
     @manage_shared_dir_error
     def test_event_based(self):
         self.run_calc(ucerf.__file__, 'job.ini')
@@ -76,7 +76,7 @@ class UcerfTestCase(CalculatorTestCase):
                    if 'mean' in f]
         self.assertEqualFiles('expected/hazard_map-mean.csv', fname)
 
-    @attr('qa', 'hazard', 'ucerf')
+    @attr('qa', 'hazard', 'event_based', 'ucerf')
     @manage_shared_dir_error
     def test_event_based_sampling(self):
         self.run_calc(ucerf.__file__, 'job_ebh.ini')
@@ -131,7 +131,7 @@ class UcerfTestCase(CalculatorTestCase):
         self.assertEqualFiles('expected/hazard_curve-sampling.csv', fname,
                               delta=1E-6)
 
-    @attr('qa', 'risk', 'ucerf')
+    @attr('qa', 'risk', 'event_based_risk', 'ucerf')
     @manage_shared_dir_error
     def test_event_based_risk(self):
         # the fast calculator ucerf_risk
@@ -144,7 +144,7 @@ class UcerfTestCase(CalculatorTestCase):
         [fname] = export(('agg_curves-stats', 'csv'), self.calc.datastore)
         self.assertEqualFiles('expected/losses_by_period-mean.csv', fname)
 
-    @attr('qa', 'risk', 'ucerf')
+    @attr('qa', 'risk', 'event_based_risk', 'ucerf')
     @manage_shared_dir_error
     def test_event_based_risk_sampling(self):
         # the fast calculator ucerf_risk
