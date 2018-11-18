@@ -76,20 +76,25 @@ def build_ruptures(srcs, srcfilter, param, monitor):
     A small wrapper around :func:
     `openquake.hazardlib.calc.stochastic.sample_ruptures`
     """
-    acc = []
+    num_ruptures = {}
+    eb_ruptures = {}
+    calc_times = {}
     n = 0
     mon = monitor('making contexts', measuremem=False)
     for src in srcs:
-        dic = sample_ruptures([src], param, srcfilter, mon)
-        vars(src).update(dic)
-        acc.append(src)
-        n += len(dic['eb_ruptures'])
+        nr, er, ct = sample_ruptures([src], param, srcfilter, mon)
+        num_ruptures += nr
+        eb_ruptures += er
+        calc_times += ct
+        n += len(er)
         if n > param['ruptures_per_block']:
-            yield acc
+            yield num_ruptures, eb_ruptures, calc_times
             n = 0
-            acc.clear()
-    if acc:
-        yield acc
+            num_ruptures.clear()
+            eb_ruptures.clear()
+            calc_times.clear()
+    if num_ruptures:
+        yield num_ruptures, eb_ruptures, calc_times
 
 
 def get_events(ebruptures, rlzs_by_gsim, num_ses):
@@ -272,22 +277,19 @@ class EventBasedCalculator(base.HazardCalculator):
         zd = {r: ProbabilityMap(self.L) for r in range(self.R)}
         return zd
 
-    def _store_ruptures(self, srcs_by_grp):
+    def _store_ruptures(self, acc, calc_times):
         gmf_size = 0
-        calc_times = AccumDict(accum=numpy.zeros(3, F32))
         mon = self.monitor('saving ruptures', measuremem=False)
-        for grp, srcs in srcs_by_grp.items():
-            for src in srcs:
-                # save the events always; save the ruptures
-                # if oq.save_ruptures is true
-                with mon:
-                    self.save_ruptures(src.eb_ruptures)
-                gmf_size += max_gmf_size(
-                    {src.src_group_id: src.eb_ruptures},
-                    self.num_rlzs_by_grp,
-                    self.samples_by_grp,
-                    len(self.oqparam.imtls))
-                calc_times += src.calc_times
+        for grp_id, eb_ruptures in acc.items():
+            # save the events always; save the ruptures
+            # if oq.save_ruptures is true
+            with mon:
+                self.save_ruptures(eb_ruptures)
+            gmf_size += max_gmf_size(
+                {grp_id: eb_ruptures},
+                self.num_rlzs_by_grp,
+                self.samples_by_grp,
+                len(self.oqparam.imtls))
         self.rupser.close()
         if gmf_size:
             self.datastore.set_attrs('events', max_gmf_size=gmf_size)
@@ -311,34 +313,33 @@ class EventBasedCalculator(base.HazardCalculator):
 
         logging.info('Building ruptures')
         smap = parallel.Starmap(build_ruptures, monitor=self.monitor())
-        eff_ruptures = AccumDict(accum=0)  # grp_id => potential ruptures
-        srcs_by_grp = AccumDict(accum=[])  # grp_id => srcs
+        num_ruptures = AccumDict(accum=0)
+        eb_ruptures = AccumDict(accum=[])
+        calc_times = AccumDict(accum=numpy.zeros(3, numpy.float32))
         for sm in self.csm.source_models:
             logging.info('Sending %s', sm)
             for sg in sm.src_groups:
                 if not sg.sources:
                     continue
                 par['gsims'] = gsims_by_trt[sg.trt]
-                eff_ruptures[sg.id] += sum(src.num_ruptures for src in sg)
                 for block in self.block_splitter(sg.sources, weight_src):
                     smap.submit(block, self.src_filter, par)
-        for srcs in smap:
-            srcs_by_grp[srcs[0].src_group_id] += srcs
+        for nr, eb, ct in smap:
+            num_ruptures += nr
+            eb_ruptures += eb
+            calc_times += ct
 
         # logic tree reduction
-        self.store_csm_info(
-            {gid: sum(src.num_ruptures for src in srcs_by_grp[gid])
-             for gid in srcs_by_grp})
+        self.store_csm_info(num_ruptures)
         store_rlzs_by_grp(self.datastore)
         self.init_logic_tree(self.csm.info)
-        self._store_ruptures(srcs_by_grp)
+        self._store_ruptures(eb_ruptures, calc_times)
         self.setting_events()
 
         def genargs():
             ruptures = []
-            for grp_id, srcs in srcs_by_grp.items():
-                for src in srcs:
-                    ruptures.extend(src.eb_ruptures)
+            for grp_id, ebrs in eb_ruptures.items():
+                ruptures.extend(ebrs)
             ruptures.sort(key=operator.attrgetter('serial'))  # not mandatory
             ct = self.oqparam.concurrent_tasks or 1
             for rups in split_in_blocks(ruptures, ct,

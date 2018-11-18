@@ -100,9 +100,10 @@ def sample_ruptures(sources, param, src_filter=source_site_noop_filter,
     :param monitor:
         monitor instance
     :returns:
-        a dictionary with eb_ruptures, num_events, num_ruptures, calc_times
+        num_ruptures, eb_ruptures, calc_times
     """
-    eb_ruptures = []
+    num_ruptures = AccumDict(accum=0)  # grp_id -> num_ruptures
+    eb_ruptures = AccumDict(accum=[])  # grp_id -> eb_ruptures
     # AccumDict of arrays with 3 elements weight, nsites, calc_time
     calc_times = AccumDict(accum=numpy.zeros(3, numpy.float32))
     # Compute and save stochastic event sets
@@ -112,13 +113,14 @@ def sample_ruptures(sources, param, src_filter=source_site_noop_filter,
     num_ses = param['ses_per_logic_tree_path']
     for src, sites in src_filter(sources):
         t0 = time.time()
+        grp_id = src.src_group_id
         ebrs = build_eb_ruptures(src, num_ses, cmaker, sites)
         n_occ = sum(ebr.n_occ.sum() for ebr in ebrs)
-        eb_ruptures.extend(ebrs)
+        eb_ruptures[grp_id].extend(ebrs)
+        num_ruptures[grp_id] += src.num_ruptures
         dt = time.time() - t0
         calc_times[src.id] += numpy.array([n_occ, src.nsites, dt])
-    dic = dict(eb_ruptures=eb_ruptures, calc_times=calc_times)
-    return dic
+    return num_ruptures, eb_ruptures, calc_times
 
 
 def build_eb_ruptures(src, num_ses, cmaker, s_sites, rup_n_occ=()):
